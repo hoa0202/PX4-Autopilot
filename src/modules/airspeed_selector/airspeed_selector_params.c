@@ -159,7 +159,7 @@ PARAM_DEFINE_INT32(ASPD_PRIMARY, 1);
  * @bit 4 Check for data variation in first 10s after sensor connection
  * @group Airspeed Validator
  */
-PARAM_DEFINE_INT32(ASPD_DO_CHECKS, 23);
+PARAM_DEFINE_INT32(ASPD_DO_CHECKS, 5);
 
 /**
  * Enable fallback to sensor-less airspeed estimation
