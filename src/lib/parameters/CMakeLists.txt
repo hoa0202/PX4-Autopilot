@@ -173,14 +173,14 @@ endif()
 
 # TODO: find a better way to do this
 if (NOT "${PX4_BOARD}" MATCHES "px4_io")
-	add_library(parameters
+	add_library(parameters STATIC EXCLUDE_FROM_ALL
 		${SRCS}
 		px4_parameters.hpp
 	)
 
 	target_link_libraries(parameters PRIVATE perf tinybson px4_platform)
 
-	target_compile_definitions(parameters PRIVATE -DMODULE_NAME="parameters" -D__KERNEL__)
+	target_compile_definitions(parameters PRIVATE -DMODULE_NAME="parameters")
 	target_compile_options(parameters
 		PRIVATE
 			#-DDEBUG_BUILD
@@ -188,7 +188,7 @@ if (NOT "${PX4_BOARD}" MATCHES "px4_io")
 			-Wno-sign-compare	# TODO: fix and enable
 	)
 else()
-	add_library(parameters ${PX4_SOURCE_DIR}/platforms/common/empty.c)
+	add_library(parameters STATIC EXCLUDE_FROM_ALL ${PX4_SOURCE_DIR}/platforms/common/empty.c)
 endif()
 add_dependencies(parameters prebuild_targets)
 

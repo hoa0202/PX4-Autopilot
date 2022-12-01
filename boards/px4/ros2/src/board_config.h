@@ -1,7 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
- *   Author: @author Lorenz Meier <lm@inf.ethz.ch>
+ *   Copyright (c) 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,25 +32,19 @@
  ****************************************************************************/
 
 /**
- * @file conversions.c
- * Implementation of commonly used conversions.
+ * @file board_config.h
+ *
+ * SITL internal definitions
  */
 
-#include <px4_platform_common/px4_config.h>
-#include <float.h>
+#pragma once
 
-#include "conversions.h"
+#define BOARD_OVERRIDE_UUID "SIMULATIONID0000" // must be of length 16
+#define PX4_SOC_ARCH_ID     PX4_SOC_ARCH_ID_SITL
 
-int16_t
-int16_t_from_bytes(uint8_t bytes[])
-{
-	union {
-		uint8_t    b[2];
-		int16_t    w;
-	} u;
+#define BOARD_HAS_POWER_CONTROL 1
 
-	u.b[1] = bytes[0];
-	u.b[0] = bytes[1];
+#define BOARD_NUMBER_BRICKS     0
 
-	return u.w;
-}
+#include <system_config.h>
+#include <px4_platform_common/board_common.h>

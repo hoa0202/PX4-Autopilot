@@ -1,6 +1,6 @@
 ############################################################################
 #
-# Copyright (c) 2017 - 2019 PX4 Development Team. All rights reserved.
+# Copyright (c) 2017 - 2022 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -143,25 +143,29 @@ define_property(GLOBAL PROPERTY PX4_SRC_FILES
 # configuration
 #
 
-set(CONFIG "px4_sitl_default" CACHE STRING "desired configuration")
+# default to px4_ros2_default if building within a ROS2 colcon environment
+if((DEFINED ENV{COLCON_PREFIX_PATH}) AND (DEFINED ENV{ROS_VERSION}))
+	if("$ENV{ROS_VERSION}" MATCHES "2")
+		message(STATUS "ROS_VERSION: $ENV{ROS_VERSION}")
+		set(CONFIG "px4_ros2_default" CACHE STRING "desired configuration") # TODO
+	endif()
+endif()
+
+if(NOT CONFIG)
+	set(CONFIG "px4_sitl_default" CACHE STRING "desired configuration")
+endif()
 
 include(px4_add_module)
 set(config_module_list)
 set(config_kernel_list)
 
 # Find Python
-# If using catkin, Python 2 is found since it points
-# to the Python libs installed with the ROS distro
-if (NOT CATKIN_DEVEL_PREFIX)
-	find_package(PythonInterp 3)
-	# We have a custom error message to tell users how to install python3.
-	if (NOT PYTHONINTERP_FOUND)
-		message(FATAL_ERROR "Python 3 not found. Please install Python 3:\n"
-			"    Ubuntu: sudo apt install python3 python3-dev python3-pip\n"
-			"    macOS: brew install python")
-	endif()
-else()
-	find_package(PythonInterp REQUIRED)
+find_package(PythonInterp 3)
+# We have a custom error message to tell users how to install python3.
+if(NOT PYTHONINTERP_FOUND)
+	message(FATAL_ERROR "Python 3 not found. Please install Python 3:\n"
+		"    Ubuntu: sudo apt install python3 python3-dev python3-pip\n"
+		"    macOS: brew install python")
 endif()
 
 option(PYTHON_COVERAGE "Python code coverage" OFF)
@@ -202,10 +206,6 @@ set_property(GLOBAL PROPERTY PX4_MODULE_CONFIG_FILES)
 
 include(platforms/${PX4_PLATFORM}/cmake/px4_impl_os.cmake)
 list(APPEND CMAKE_MODULE_PATH ${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake)
-
-if(EXISTS "${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake/init.cmake")
-	include(init)
-endif()
 
 # CMake build type (Debug Release RelWithDebInfo MinSizeRel Coverage)
 if(NOT CMAKE_BUILD_TYPE)
@@ -250,20 +250,18 @@ endif()
 
 set(package-contact "px4users@googlegroups.com")
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# For the catkin build process, unset build of dynamically-linked binaries
-# and do not change CMAKE_RUNTIME_OUTPUT_DIRECTORY
-if (NOT CATKIN_DEVEL_PREFIX)
-	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PX4_BINARY_DIR})
-	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${PX4_BINARY_DIR})
-	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PX4_BINARY_DIR})
-else()
-	SET(BUILD_SHARED_LIBS OFF)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PX4_BINARY_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${PX4_BINARY_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PX4_BINARY_DIR})
+
+if(EXISTS "${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake/init.cmake")
+	include(init)
 endif()
 
 #=============================================================================
@@ -310,21 +308,6 @@ endif()
 include(ccache)
 
 #=============================================================================
-# find programs and packages
-#
-
-# see if catkin was invoked to build this
-if (CATKIN_DEVEL_PREFIX)
-	message(STATUS "catkin ENABLED")
-	find_package(catkin REQUIRED)
-	if (catkin_FOUND)
-		catkin_package()
-	else()
-		message(FATAL_ERROR "catkin not found")
-	endif()
-endif()
-
-#=============================================================================
 # get chip and chip manufacturer
 #
 px4_os_determine_build_chip()
@@ -336,18 +319,18 @@ if(NOT PX4_CHIP)
 endif()
 
 #=============================================================================
-# build flags
-#
-include(px4_add_common_flags)
-px4_add_common_flags()
-px4_os_add_flags()
-
-#=============================================================================
 # board cmake init (optional)
 #
 if(EXISTS ${PX4_BOARD_DIR}/cmake/init.cmake)
 	include(${PX4_BOARD_DIR}/cmake/init.cmake)
 endif()
+
+#=============================================================================
+# build flags
+#
+include(px4_add_common_flags)
+px4_add_common_flags()
+px4_os_add_flags()
 
 #=============================================================================
 # message, and airframe generation
@@ -430,8 +413,13 @@ add_library(kernel_parameters_interface INTERFACE)
 include(px4_add_library)
 add_subdirectory(src/lib EXCLUDE_FROM_ALL)
 
-add_subdirectory(platforms/${PX4_PLATFORM}/src/px4)
-add_subdirectory(platforms EXCLUDE_FROM_ALL)
+add_subdirectory(platforms/${PX4_PLATFORM}/src/px4 EXCLUDE_FROM_ALL)
+
+if(${PX4_PLATFORM} MATCHES "ros2") # TODO: fix
+	add_subdirectory(platforms/common/work_queue EXCLUDE_FROM_ALL)
+else()
+	add_subdirectory(platforms EXCLUDE_FROM_ALL)
+endif()
 
 if(EXISTS "${PX4_BOARD_DIR}/CMakeLists.txt")
 	add_subdirectory(${PX4_BOARD_DIR})
@@ -450,14 +438,19 @@ add_subdirectory(src/lib/metadata EXCLUDE_FROM_ALL)
 add_subdirectory(src/lib/parameters EXCLUDE_FROM_ALL)
 
 if(${PX4_PLATFORM} STREQUAL "nuttx" AND NOT CONFIG_BUILD_FLAT)
-target_link_libraries(parameters_interface INTERFACE usr_parameters)
-target_link_libraries(kernel_parameters_interface INTERFACE parameters)
+	target_link_libraries(parameters_interface INTERFACE usr_parameters)
+	target_link_libraries(kernel_parameters_interface INTERFACE parameters)
 else()
-target_link_libraries(parameters_interface INTERFACE parameters)
+	target_link_libraries(parameters_interface INTERFACE parameters)
 endif()
 
 # firmware added last to generate the builtin for included modules
 add_subdirectory(platforms/${PX4_PLATFORM})
+
+if(${PX4_PLATFORM} MATCHES "ros2") # TODO: fix
+	ament_target_dependencies(uorb_msgs rclcpp std_msgs)
+	rosidl_target_interfaces(uorb_msgs ${PROJECT_NAME} "rosidl_typesupport_cpp")
+endif()
 
 #=============================================================================
 # uORB graph generation: add a custom target 'uorb_graph'
@@ -486,17 +479,13 @@ include(doxygen)
 include(metadata)
 include(package)
 
-# print size
-add_custom_target(size
-	COMMAND size $<TARGET_FILE:px4>
-	DEPENDS px4
-	WORKING_DIRECTORY ${PX4_BINARY_DIR}
-	USES_TERMINAL
-	)
-
 # install python requirements using configured python
 add_custom_target(install_python_requirements
 	COMMAND ${PYTHON_EXECUTABLE} -m pip install --requirement ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
 	DEPENDS ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
 	USES_TERMINAL
 )
+
+if(EXISTS "${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake/finalize.cmake")
+	include(finalize)
+endif()

@@ -1,7 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
- *   Author: Lorenz Meier <lm@inf.ethz.ch>
+ * Copyright (C) 2015 Mark Charlebois. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,30 +31,34 @@
  *
  ****************************************************************************/
 
-/**
- * @file conversions.h
- * Definition of commonly used conversions.
- *
- * Includes bit / byte / geo representation and unit conversions.
- */
+#pragma once
 
-#ifndef CONVERSIONS_H_
-#define CONVERSIONS_H_
-#include <float.h>
-#include <stdint.h>
+#include <px4_platform_common/posix.h>
+#include <semaphore.h>
+#include <px4_platform_common/workqueue.h>
+
+#include <px4_platform_common/sem.h>
 
 __BEGIN_DECLS
 
-/**
- * Converts a signed 16 bit integer from big endian to little endian.
- *
- * This function is for commonly used 16 bit big endian sensor data,
- * delivered by driver routines as two 8 bit numbers in big endian order.
- * Common vendors with big endian representation are Invense, Bosch and
- * Honeywell. ST micro devices tend to use a little endian representation.
- */
-__EXPORT int16_t int16_t_from_bytes(uint8_t bytes[]);
+extern px4_sem_t _hrt_work_lock;
+extern struct wqueue_s g_hrt_work;
+
+void hrt_work_queue_init(void);
+int hrt_work_queue(struct work_s *work, worker_t worker, void *arg, uint32_t usdelay);
+void hrt_work_cancel(struct work_s *work);
+
+static inline void hrt_work_lock(void);
+static inline void hrt_work_lock()
+{
+	px4_sem_wait(&_hrt_work_lock);
+}
+
+static inline void hrt_work_unlock(void);
+static inline void hrt_work_unlock()
+{
+	px4_sem_post(&_hrt_work_lock);
+}
 
 __END_DECLS
 
-#endif /* CONVERSIONS_H_ */
